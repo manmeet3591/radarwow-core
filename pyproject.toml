@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "radarwow-core"
+version = "0.1.0"
+description = "radar-wow core: common data model (xradar DataTree), S/C/X band configuration, readers incl. IMD, free test data and radar health checks"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+dependencies = ["xradar>=0.12", "xarray>=2024.10", "numpy", "scipy", "matplotlib", "open-radar-data", "boto3", "netCDF4", "h5netcdf"]
+
+[project.optional-dependencies]
+dev = ["pytest", "jupytext", "nbclient", "ipykernel"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+namespaces = true
+
+[tool.setuptools.package-data]
+"radarwow.core" = ["bands/*.toml"]

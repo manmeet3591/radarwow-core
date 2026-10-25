@@ -1,0 +1,22 @@
+# Band S parameters. Every value carries its source; change values here, not in algorithm code.
+frequency_ghz = 2.8
+
+[params.kdp_window_km]
+value = 7.0
+source = "Vulpiani et al. 2012 use L = 7 km at C band (sigma_KDP ~0.05 deg/km); X uses a shorter 4 km window (Vulpiani Eq. 2 trade-off, stronger KDP at X). Tunable."
+
+[params.kdp_min]
+value = -2.0
+source = "Vulpiani et al. 2012 physical range lower bound (deg/km)."
+
+[params.kdp_max]
+value = 10
+source = "Vulpiani et al. 2012: 20 deg/km at C band; S and X scaled by frequency (KDP is proportional to f in Rayleigh rain). Scaled values are an assumption."
+
+[params.zphi_alpha]
+value = 0.015
+source = "A/KDP ratio (dB/deg). S: MRMS range 0.015-0.035 (Ryzhkov et al. 2014); C: 0.08 (Vulpiani 2012 first guess; Bringi 2001 per-ray 0.04-0.135); X: 0.28 (Testud et al. 2000 gives 0.32 at 10 C; typical 0.25-0.33)."
+
+[params.rhohv_rain_min]
+value = 0.90
+source = "Rain/meteorological gate screen used for PHIDP processing (Giangrande et al. 2013 note rhoHV~0.9 screens are common)."
