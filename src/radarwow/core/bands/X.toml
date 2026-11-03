@@ -20,3 +20,15 @@ source = "A/KDP ratio (dB/deg). S: MRMS range 0.015-0.035 (Ryzhkov et al. 2014);
 [params.rhohv_rain_min]
 value = 0.90
 source = "Rain/meteorological gate screen used for PHIDP processing (Giangrande et al. 2013 note rhoHV~0.9 screens are common)."
+
+[params.zphi_alpha_range]
+value = [0.14, 0.40]
+source = "Search range for the self-consistent alpha at X band around Testud et al. 2000's 0.32 (typical 0.25-0.33), widened. Assumption."
+
+[params.zdr_beta]
+value = 0.05
+source = "Differential attenuation per degree PHIDP at X band (dB/deg); typical literature range 0.03-0.06. Assumption, tune per radar."
+
+[params.zphi_b]
+value = 0.78
+source = "Exponent in A = a Z^b (Testud et al. 2000, X band)."

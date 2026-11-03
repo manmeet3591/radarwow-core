@@ -45,6 +45,7 @@ class Algorithm:
     Constructor keyword arguments override entries of the class-level ``params`` dict.
     """
 
+    __test__ = False  # class names like Testud2000ZPHI are not pytest tests
     name: str = ""
     stage: str = ""
     reference: Reference | None = None
