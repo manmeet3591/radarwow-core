@@ -32,3 +32,11 @@ source = "Differential attenuation per degree PHIDP at X band (dB/deg); typical 
 [params.zphi_b]
 value = 0.78
 source = "Exponent in A = a Z^b (Testud et al. 2000, X band)."
+
+[params.ra_min_dphi]
+value = 5
+source = "Minimum ray delta PHIDP (deg) for using R(A). radar-wow assumption from the S/C/X sample analysis (radarwow-estimation notebook 01): below it the R(A)/R(Z) ratio develops a heavy tail. At S band A is ~5x smaller per degree than at C, so a larger delta PHIDP is needed. Tunable."
+
+[params.ra_max_pia]
+value = 10
+source = "Largest two-way PIA (dB) at which ZPHI specific attenuation is used for R(A). radar-wow assumption from the sample analysis (radarwow-estimation notebook 01): at X band A_H becomes unstable beyond ~10 dB (99th percentile jumps from ~1.9 to ~8 dB/km) as ZPHI amplifies noise near the end of strongly attenuated paths. Tunable."

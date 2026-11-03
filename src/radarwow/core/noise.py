@@ -27,6 +27,25 @@ def noise_floor(z: np.ndarray, r_m: np.ndarray, pct: float = 5.0) -> tuple[np.nd
     return n0 + 20 * np.log10(r_km), n0, False
 
 
+def snr_estimate(ds: xr.Dataset) -> np.ndarray:
+    """Signal-to-noise ratio (dB) per gate.
+
+    Uses the file's SNR field when present (a biased SNR field, as on ARM CSAPR2, is caught by the
+    SQI test in `signal_mask`, which callers combine with this). Otherwise SNR ~ Z - (N0 + 20 log10 r)
+    from the noise curve; if the source censors noise (e.g. NEXRAD), N0 is taken from the weakest
+    echoes kept (1st percentile, the censoring threshold), so the estimate is a lower bound.
+    """
+    if "SNRH" in ds:
+        return ds["SNRH"].values.astype("float64")
+    z = ds["DBZH"].values.astype("float64")
+    r_km = np.maximum(ds["range"].values / 1e3, 0.1)
+    curve, _, censored = noise_floor(z, ds["range"].values)
+    if censored:
+        zc = z - 20 * np.log10(r_km)[None, :]
+        curve = float(np.nanpercentile(zc, 1.0)) + 20 * np.log10(r_km)
+    return z - curve[None, :]
+
+
 def signal_mask(ds: xr.Dataset, margin_db: float = 3.0, snr_min: float = 3.0, sqi_min: float = 0.4) -> np.ndarray:
     """Boolean (azimuth, range) mask of gates with real echo.
 
