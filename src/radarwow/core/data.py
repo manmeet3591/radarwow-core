@@ -106,3 +106,38 @@ def nexrad_aws(site: str, when, sweeps=None) -> xr.DataTree:
     dt = open_volume(local, band="S", sweeps=sweeps)
     dt.attrs["radarwow_sample"] = f"nexrad_aws:{os.path.basename(key)}"
     return dt
+
+
+def nexrad_aws_files(site: str, start, end, cache_dir: str | None = None) -> list:
+    """Download every NEXRAD Level II volume of ``site`` with start time in [start, end) (UTC).
+
+    Files go to ``cache_dir`` (default ``~/.cache/radarwow/nexrad``) and are reused. Returns (time, path)
+    pairs sorted by time. Hours missing from the archive (radar outages) are simply absent.
+    """
+    import os
+
+    import boto3
+    import pandas as pd
+    from botocore import UNSIGNED
+    from botocore.config import Config
+
+    start, end = pd.Timestamp(start), pd.Timestamp(end)
+    cache_dir = cache_dir or os.path.expanduser("~/.cache/radarwow/nexrad")
+    os.makedirs(cache_dir, exist_ok=True)
+    s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED, connect_timeout=10, read_timeout=120,
+                                          retries={"max_attempts": 3}))
+    out = []
+    for day in pd.date_range(start.normalize(), end.normalize(), freq="D"):
+        prefix = f"{day:%Y/%m/%d}/{site}/"
+        for page in s3.get_paginator("list_objects_v2").paginate(Bucket="unidata-nexrad-level2", Prefix=prefix):
+            for o in page.get("Contents", []):
+                k = o["Key"]
+                if k.endswith("_MDM"):
+                    continue
+                t = pd.to_datetime(os.path.basename(k)[4:19], format="%Y%m%d_%H%M%S")
+                if start <= t < end:
+                    local = os.path.join(cache_dir, os.path.basename(k))
+                    if not os.path.exists(local):
+                        s3.download_file("unidata-nexrad-level2", k, local)
+                    out.append((t, local))
+    return sorted(out)

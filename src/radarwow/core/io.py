@@ -113,7 +113,12 @@ def open_volume(path, fmt: str = "auto", band: Band | str | None = None, sweeps=
         dt = open_imd_fsl(path)
     else:
         kw = {"sweep": sweeps} if sweeps is not None else {}
-        dt = OPENERS[fmt](path, **kw)
+        try:
+            dt = OPENERS[fmt](path, **kw)
+        except (IndexError, KeyError, ValueError) as err:
+            if sweeps is not None:
+                raise
+            dt = _open_sweepwise(OPENERS[fmt], path, err)
     out = {"/": dt.to_dataset()}
     mappings = {}
     for name, node in dt.children.items():
@@ -129,6 +134,37 @@ def open_volume(path, fmt: str = "auto", band: Band | str | None = None, sweeps=
     tree.attrs.update(dt.attrs)
     tree.attrs["radarwow_format"] = fmt
     tree.attrs["radarwow_band"] = Band(band).value if band else _guess_band(tree, fmt)
+    return tree
+
+
+def _open_sweepwise(opener, path, err, max_sweeps: int = 40, stop_after: int = 3):
+    """Open sweep by sweep when the whole file fails (truncated or partly corrupt archives).
+
+    Damaged sweeps are skipped and listed in the root attribute ``radarwow_bad_sweeps``; reading stops
+    after ``stop_after`` consecutive failures past the last good sweep (the end of a truncated file).
+    """
+    good, bad, misses = {}, [], 0
+    root = None
+    for i in range(max_sweeps):
+        try:
+            part = opener(path, sweep=[i])
+        except Exception:  # noqa: BLE001 - any decoder error marks this sweep as damaged
+            bad.append(i)
+            misses += 1
+            if good and misses >= stop_after:
+                break
+            continue
+        misses = 0
+        root = root if root is not None else part.to_dataset()
+        for name, node in part.children.items():
+            if name.startswith("sweep"):
+                good[name] = node.to_dataset()
+    if not good:
+        raise err
+    last = max(int(n.split("_")[1]) for n in good)
+    tree = xr.DataTree.from_dict({"/": root, **good})
+    tree.attrs["radarwow_bad_sweeps"] = [i for i in bad if i < last]
+    tree.attrs["radarwow_last_sweep"] = last
     return tree
 
 
