@@ -2,7 +2,7 @@
 
 **radar-wow: Core.** Shared I/O (NEXRAD, ODIM, CfRadial, IRIS, IMD FSL), canonical moment names, band configs (S/C/X), algorithm interface, free sample data, health checks.
 
-Part of [radar-wow](https://github.com/radar-wow), a set of repos that together build a radar QPE system that works for S, C and X band radars.
+Part of [radar-wow](https://github.com/manmeet3591/radar-wow), a set of repos that together build a radar QPE system that works for S, C and X band radars.
 Every algorithm is one class implementing one paper, with the same interface: it takes an xradar sweep or volume with canonical moment names, declares the bands and moments it needs, and records provenance.
 
 ## Sub-components
@@ -17,12 +17,12 @@ Every algorithm is one class implementing one paper, with the same interface: it
 ## Install
 
 ```bash
-pip install git+https://github.com/radar-wow/radarwow-core
+pip install git+https://github.com/manmeet3591/radarwow-core
 ```
 
 ## Notebooks (free data, S / C / X band)
 
-- [`notebooks/00_free_data_and_health_checks.ipynb`](notebooks/00_free_data_and_health_checks.ipynb): open in Colab via `https://colab.research.google.com/github/radar-wow/radarwow-core/blob/main/notebooks/00_free_data_and_health_checks.ipynb`
+- [`notebooks/00_free_data_and_health_checks.ipynb`](notebooks/00_free_data_and_health_checks.ipynb): open in Colab via `https://colab.research.google.com/github/manmeet3591/radarwow-core/blob/main/notebooks/00_free_data_and_health_checks.ipynb`
 
 ## Results
 

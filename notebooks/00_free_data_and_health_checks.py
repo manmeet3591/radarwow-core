@@ -28,7 +28,7 @@
 
 # %%
 # Colab: uncomment to install
-# !pip install -q "git+https://github.com/radar-wow/radarwow-core"
+# !pip install -q "git+https://github.com/manmeet3591/radarwow-core"
 
 # %%
 import warnings
