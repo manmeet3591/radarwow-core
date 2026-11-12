@@ -141,3 +141,39 @@ def nexrad_aws_files(site: str, start, end, cache_dir: str | None = None) -> lis
                         s3.download_file("unidata-nexrad-level2", k, local)
                     out.append((t, local))
     return sorted(out)
+
+
+def fmi_aws_files(site: str, start, end, cache_dir: str | None = None, every_min: int = 5) -> list:
+    """Download Finnish Meteorological Institute ODIM HDF5 volumes (C band) of ``site`` (e.g. ``"fianj"``) with
+    start time in [start, end) from the open AWS bucket ``fmi-opendata-radar-volume-hdf5`` (no account).
+
+    Volumes are every 5 minutes, ~25 MB each; ``every_min`` (a multiple of 5) thins them. Returns sorted
+    (time, path) pairs; files are cached in ``cache_dir`` (default ``~/.cache/radarwow/fmi``).
+    """
+    import os
+
+    import boto3
+    import pandas as pd
+    from botocore import UNSIGNED
+    from botocore.config import Config
+
+    start, end = pd.Timestamp(start), pd.Timestamp(end)
+    cache_dir = cache_dir or os.path.expanduser("~/.cache/radarwow/fmi")
+    os.makedirs(cache_dir, exist_ok=True)
+    s3 = boto3.client("s3", region_name="eu-west-1", config=Config(signature_version=UNSIGNED, connect_timeout=10, read_timeout=120,
+                                                                   retries={"max_attempts": 3}))
+    out = []
+    for day in pd.date_range(start.normalize(), end.normalize(), freq="D"):
+        for page in s3.get_paginator("list_objects_v2").paginate(Bucket="fmi-opendata-radar-volume-hdf5", Prefix=f"{day:%Y/%m/%d}/{site}/"):
+            for o in page.get("Contents", []):
+                k = o["Key"]
+                name = os.path.basename(k)
+                if not name.endswith("_PVOL.h5"):
+                    continue
+                t = pd.to_datetime(name[:12], format="%Y%m%d%H%M")
+                if start <= t < end and t.minute % every_min == 0:
+                    local = os.path.join(cache_dir, name)
+                    if not os.path.exists(local):
+                        s3.download_file("fmi-opendata-radar-volume-hdf5", k, local)
+                    out.append((t, local))
+    return sorted(out)
