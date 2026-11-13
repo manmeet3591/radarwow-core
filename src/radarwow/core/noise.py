@@ -46,21 +46,29 @@ def snr_estimate(ds: xr.Dataset) -> np.ndarray:
     return z - curve[None, :]
 
 
-def signal_mask(ds: xr.Dataset, margin_db: float = 3.0, snr_min: float = 3.0, sqi_min: float = 0.4) -> np.ndarray:
+def signal_mask(ds: xr.Dataset, margin_db: float = 3.0, snr_min: float = 3.0, sqi_min: float = 0.4,
+                snr_trust_db: float | None = None) -> np.ndarray:
     """Boolean (azimuth, range) mask of gates with real echo.
 
     Uses every available quality moment (SNR > snr_min AND SQI/NCP > sqi_min): one alone can be
     biased (e.g. the ARM CSAPR2 SNR field marks 98 % of gates as signal while NCP marks ~42 %).
-    Without either, falls back to the reflectivity noise floor.
+    Where the source's SNR is trustworthy, a gate with SNR >= ``snr_trust_db`` counts as signal whatever
+    its SQI. The reader sets this per format (sweep attribute ``radarwow_snr_trust_db``; ODIM: 15 dB):
+    FMI's SQI is low in rain (median 0.5-0.8 at 20-40 dBZ, SNR 37-50 dB), and the SQI test alone discarded
+    10-15 % of those rain gates (34 % at 10-20 dBZ). It is off by default because some SNR fields are
+    unreliable (ARM CSAPR2, above). Without SNR or SQI, falls back to the reflectivity noise floor.
     """
-    masks = []
-    if "SNRH" in ds:
-        masks.append(np.asarray(ds["SNRH"].values > snr_min))
-    if "SQIH" in ds:
-        masks.append(np.asarray(ds["SQIH"].values > sqi_min))
+    if snr_trust_db is None:
+        snr_trust_db = ds.attrs.get("radarwow_snr_trust_db")
     z = ds["DBZH"].values.astype("float64")
-    if masks:
-        return np.logical_and.reduce(masks) & np.isfinite(z)
+    has_snr, has_sqi = "SNRH" in ds, "SQIH" in ds
+    if has_snr or has_sqi:
+        snr = np.asarray(ds["SNRH"].values) if has_snr else None
+        ok = (snr > snr_min) if has_snr else np.ones(z.shape, bool)
+        if has_sqi:
+            sqi_ok = np.asarray(ds["SQIH"].values) > sqi_min
+            ok &= (sqi_ok | (snr >= snr_trust_db)) if (has_snr and snr_trust_db is not None) else sqi_ok
+        return ok & np.isfinite(z)
     curve, _, censored = noise_floor(z, ds["range"].values)
     if censored:
         return np.isfinite(z)

@@ -129,6 +129,8 @@ def open_volume(path, fmt: str = "auto", band: Band | str | None = None, sweeps=
                 for m in ("DBZH", "ZDR", "PHIDP", "RHOHV", "VRADH", "WRADH"):
                     if m in ds:
                         ds[m], _ = mask_nexrad_codes(ds[m])
+            if fmt == "odim":
+                ds.attrs["radarwow_snr_trust_db"] = 15.0  # see noise.signal_mask (FMI SQI is low in rain)
         out[name] = ds
     tree = xr.DataTree.from_dict(out)
     tree.attrs.update(dt.attrs)

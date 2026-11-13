@@ -68,3 +68,16 @@ def test_synthetic_ray_truth():
     r, psi, phi, kdp = synthetic_ray(noise=0.0)
     assert np.allclose(psi, phi)
     assert np.isclose(phi[-1] - phi[0], 2 * kdp.sum() * 0.25, rtol=1e-6)
+
+
+def test_signal_mask_snr_trust_is_opt_in():
+    import numpy as np
+    import xarray as xr
+
+    from radarwow.core.noise import signal_mask
+
+    ds = xr.Dataset({"DBZH": (("azimuth", "range"), np.full((1, 3), 30.0)), "SNRH": (("azimuth", "range"), [[40.0, 40.0, 5.0]]),
+                     "SQIH": (("azimuth", "range"), [[0.9, 0.2, 0.2]])})
+    assert signal_mask(ds).tolist() == [[True, False, False]]
+    ds.attrs["radarwow_snr_trust_db"] = 15.0
+    assert signal_mask(ds).tolist() == [[True, True, False]]
