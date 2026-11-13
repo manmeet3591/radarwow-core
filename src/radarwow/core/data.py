@@ -177,3 +177,40 @@ def fmi_aws_files(site: str, start, end, cache_dir: str | None = None, every_min
                         s3.download_file("fmi-opendata-radar-volume-hdf5", k, local)
                     out.append((t, local))
     return sorted(out)
+
+
+def ideam_aws_files(site: str, start, end, cache_dir: str | None = None, cycle_min: int = 5) -> list:
+    """Download IDEAM (Colombia) radar files of ``site`` (e.g. ``"Tablazo"``) from the open AWS bucket
+    ``s3-radaresideam`` (no account) and group them into volumes.
+
+    The IRIS radars there write one sweep per file (plus a reflectivity-only volume task), every ``cycle_min``
+    minutes; files whose time falls in the same cycle form one volume. Returns sorted (cycle start, [paths]) pairs,
+    ready for `open_volume`. IMD radars use the same IRIS one-sweep-per-file layout.
+    """
+    import os
+
+    import boto3
+    import pandas as pd
+    from botocore import UNSIGNED
+    from botocore.config import Config
+
+    start, end = pd.Timestamp(start), pd.Timestamp(end)
+    cache_dir = cache_dir or os.path.expanduser("~/.cache/radarwow/ideam")
+    os.makedirs(cache_dir, exist_ok=True)
+    s3 = boto3.client("s3", region_name="us-east-1", config=Config(signature_version=UNSIGNED, connect_timeout=10, read_timeout=120,
+                                                                   retries={"max_attempts": 3}))
+    cycles: dict = {}
+    for day in pd.date_range(start.normalize(), end.normalize(), freq="D"):
+        for page in s3.get_paginator("list_objects_v2").paginate(Bucket="s3-radaresideam", Prefix=f"l2_data/{day:%Y/%m/%d}/{site}/"):
+            for o in page.get("Contents", []):
+                name = os.path.basename(o["Key"])
+                if ".RAW" not in name or name.endswith(".gz"):
+                    continue
+                t = pd.to_datetime(name[3:15], format="%y%m%d%H%M%S")
+                c = t.floor(f"{cycle_min}min")
+                if start <= c < end:
+                    local = os.path.join(cache_dir, name)
+                    if not os.path.exists(local):
+                        s3.download_file("s3-radaresideam", o["Key"], local)
+                    cycles.setdefault(c, []).append(local)
+    return sorted((c, sorted(p)) for c, p in cycles.items())

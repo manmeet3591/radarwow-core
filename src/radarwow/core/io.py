@@ -96,13 +96,45 @@ def open_imd_fsl(paths) -> xr.DataTree:
     return dt
 
 
+def iris_wavelength_m(path) -> float | None:
+    """Wavelength (m) from an IRIS RAW ingest header (stored in 1/100 cm), or None."""
+    try:
+        f = xd.io.backends.iris.IrisRawFile(str(path), loaddata=False)
+        wl = f.ingest_header["task_configuration"]["task_misc_info"]["wavelength"]
+        return float(wl) / 1e4 if wl else None
+    except Exception:  # noqa: BLE001 - header layout differs between IRIS versions
+        return None
+
+
+def open_sweep_files(paths, fmt: str = "iris") -> xr.DataTree:
+    """One volume from several files holding one or more sweeps each (IRIS tasks written one sweep per file, as
+    IDEAM and IMD radars do). Sweeps are sorted by elevation and renumbered; the root comes from the first file."""
+    paths = [str(p) for p in paths]
+    root, sweeps = None, []
+    for p in paths:
+        dt = OPENERS[fmt](p)
+        root = root if root is not None else dt.to_dataset()
+        for name, node in dt.children.items():
+            if name.startswith("sweep"):
+                ds = node.to_dataset()
+                sweeps.append((float(np.nanmedian(ds["elevation"].values)), p, ds))
+    sweeps.sort(key=lambda s: (s[0], s[1]))
+    tree = xr.DataTree.from_dict({"/": root, **{f"sweep_{i}": ds for i, (_, _, ds) in enumerate(sweeps)}})
+    if fmt == "iris":
+        wl = iris_wavelength_m(paths[0])
+        if wl:
+            tree.attrs["wavelength_m"] = wl
+    return tree
+
+
 def open_volume(path, fmt: str = "auto", band: Band | str | None = None, sweeps=None) -> xr.DataTree:
     """Open a volume, standardize moment names on every sweep, and record the band.
 
     ``path`` may be a single file or (IMD) a list of per-sweep files.
     """
     if not isinstance(path, (str, os.PathLike)):
-        fmt = "imd_fsl"
+        first = str(sorted(path)[0])
+        fmt = "iris_files" if detect_format(first) == "iris" else "imd_fsl"
     else:
         path = str(path)
         if path.endswith(".gz"):
@@ -111,6 +143,8 @@ def open_volume(path, fmt: str = "auto", band: Band | str | None = None, sweeps=
             fmt = detect_format(path)
     if fmt == "imd_fsl":
         dt = open_imd_fsl(path)
+    elif fmt == "iris_files":
+        dt = open_sweep_files(path, "iris")
     else:
         kw = {"sweep": sweeps} if sweeps is not None else {}
         try:
@@ -119,6 +153,10 @@ def open_volume(path, fmt: str = "auto", band: Band | str | None = None, sweeps=
             if sweeps is not None:
                 raise
             dt = _open_sweepwise(OPENERS[fmt], path, err)
+        if fmt == "iris" and "wavelength_m" not in dt.attrs:
+            wl = iris_wavelength_m(path)
+            if wl:
+                dt.attrs["wavelength_m"] = wl
     out = {"/": dt.to_dataset()}
     mappings = {}
     for name, node in dt.children.items():
